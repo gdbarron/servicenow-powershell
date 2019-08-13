@@ -1,63 +1,51 @@
 function Get-ServiceNowConfigurationItem {
-    param(
+    [OutputType([System.Management.Automation.PSCustomObject])]
+    [CmdletBinding(DefaultParameterSetName, SupportsPaging)]
+    Param(
         # Machine name of the field to order by
-        [parameter(mandatory=$false)]
-        [parameter(ParameterSetName='SpecifyConnectionFields')]
-        [parameter(ParameterSetName='UseConnectionObject')]
-        [parameter(ParameterSetName='SetGlobalAuth')]
-        [string]$OrderBy='name',
+        [Parameter(Mandatory = $false)]
+        [string]$OrderBy = 'name',
 
         # Direction of ordering (Desc/Asc)
-        [parameter(mandatory=$false)]
-        [parameter(ParameterSetName='SpecifyConnectionFields')]
-        [parameter(ParameterSetName='UseConnectionObject')]
-        [parameter(ParameterSetName='SetGlobalAuth')]
-        [ValidateSet("Desc", "Asc")]
-        [string]$OrderDirection='Desc',
+        [Parameter(Mandatory = $false)]
+        [ValidateSet('Desc', 'Asc')]
+        [string]$OrderDirection = 'Desc',
 
         # Maximum number of records to return
-        [parameter(mandatory=$false)]
-        [parameter(ParameterSetName='SpecifyConnectionFields')]
-        [parameter(ParameterSetName='UseConnectionObject')]
-        [parameter(ParameterSetName='SetGlobalAuth')]
-        [int]$Limit=10,
+        [Parameter(Mandatory = $false)]
+        [int]$Limit,
+
+        # Fields to return
+        [Parameter(Mandatory = $false)]
+        [Alias('Fields')]
+        [string[]]$Properties,
 
         # Hashtable containing machine field names and values returned must match exactly (will be combined with AND)
-        [parameter(mandatory=$false)]
-        [parameter(ParameterSetName='SpecifyConnectionFields')]
-        [parameter(ParameterSetName='UseConnectionObject')]
-        [parameter(ParameterSetName='SetGlobalAuth')]
-        [hashtable]$MatchExact=@{},
+        [Parameter(Mandatory = $false)]
+        [hashtable]$MatchExact = @{},
 
         # Hashtable containing machine field names and values returned rows must contain (will be combined with AND)
-        [parameter(mandatory=$false)]
-        [parameter(ParameterSetName='SpecifyConnectionFields')]
-        [parameter(ParameterSetName='UseConnectionObject')]
-        [parameter(ParameterSetName='SetGlobalAuth')]
-        [hashtable]$MatchContains=@{},
+        [Parameter(Mandatory = $false)]
+        [hashtable]$MatchContains = @{},
 
-        # Whether to return manipulated display values rather than actual database values.
-        [parameter(mandatory=$false)]
-        [parameter(ParameterSetName='SpecifyConnectionFields')]
-        [parameter(ParameterSetName='UseConnectionObject')]
-        [parameter(ParameterSetName='SetGlobalAuth')]
-        [ValidateSet("true","false", "all")]
-        [string]$DisplayValues='true',
+        # Whether or not to show human readable display values instead of machine values
+        [Parameter(Mandatory = $false)]
+        [ValidateSet('true', 'false', 'all')]
+        [string]$DisplayValues = 'true',
 
-        [Parameter(ParameterSetName='SpecifyConnectionFields', Mandatory=$True)]
+        [Parameter(ParameterSetName = 'SpecifyConnectionFields', Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
-        [PSCredential]
-        $ServiceNowCredential,
+        [Alias('ServiceNowCredential')]
+        [PSCredential]$Credential,
 
-        [Parameter(ParameterSetName='SpecifyConnectionFields', Mandatory=$True)]
-        [ValidateNotNullOrEmpty()]
-        [string]
-        $ServiceNowURL,
+        [Parameter(ParameterSetName = 'SpecifyConnectionFields', Mandatory = $true)]
+        [ValidateScript({Test-ServiceNowURL -Url $_})]
+        [Alias('Url')]
+        [string]$ServiceNowURL,
 
-        [Parameter(ParameterSetName='UseConnectionObject', Mandatory=$True)]
+        [Parameter(ParameterSetName = 'UseConnectionObject', Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
-        [Hashtable]
-        $Connection
+        [hashtable]$Connection
     )
 
     # Query Splat
@@ -71,25 +59,35 @@ function Get-ServiceNowConfigurationItem {
 
     # Table Splat
     $getServiceNowTableSplat = @{
-        Table           = 'cmdb_ci'
-        Query           = $Query
-        Limit           = $Limit
-        DisplayValues   = $DisplayValues
+        Table         = 'cmdb_ci'
+        Query         = $Query
+        Fields        = $Properties
+        DisplayValues = $DisplayValues
     }
 
     # Update the Table Splat if the parameters have values
-    if ($null -ne $PSBoundParameters.Connection)
-    {
-        $getServiceNowTableSplat.Add('Connection',$Connection)
+    if ($null -ne $PSBoundParameters.Connection) {
+        $getServiceNowTableSplat.Add('Connection', $Connection)
     }
-    elseif ($null -ne $PSBoundParameters.ServiceNowCredential -and $null -ne $PSBoundParameters.ServiceNowURL)
-    {
-         $getServiceNowTableSplat.Add('ServiceNowCredential',$ServiceNowCredential)
-         $getServiceNowTableSplat.Add('ServiceNowURL',$ServiceNowURL)
+    elseif ($null -ne $PSBoundParameters.Credential -and $null -ne $PSBoundParameters.ServiceNowURL) {
+        $getServiceNowTableSplat.Add('Credential', $Credential)
+        $getServiceNowTableSplat.Add('ServiceNowURL', $ServiceNowURL)
+    }
+
+    # Only add the Limit parameter if it was explicitly provided
+    if ($PSBoundParameters.ContainsKey('Limit')) {
+        $getServiceNowTableSplat.Add('Limit', $Limit)
+    }
+
+    # Add all provided paging parameters
+    ($PSCmdlet.PagingParameters | Get-Member -MemberType Property).Name | Foreach-Object {
+        $getServiceNowTableSplat.Add($_, $PSCmdlet.PagingParameters.$_)
     }
 
     # Perform query and return each object in the format.ps1xml format
     $Result = Get-ServiceNowTable @getServiceNowTableSplat
-    $Result | ForEach-Object{$_.PSObject.TypeNames.Insert(0,"ServiceNow.ConfigurationItem")}
+    If (-not $Properties) {
+        $Result | ForEach-Object{$_.PSObject.TypeNames.Insert(0,"ServiceNow.ConfigurationItem")}
+    }
     $Result
 }

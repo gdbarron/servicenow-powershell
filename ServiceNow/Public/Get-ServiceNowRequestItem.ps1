@@ -1,18 +1,34 @@
-function Get-ServiceNowIncident{
+function Get-ServiceNowRequestItem {
+<#
+    .SYNOPSIS
+        Query for Request Item (RITM) tickets.
+
+    .DESCRIPTION
+        Query for Request Item (RITM) tickets from the sc_req_item table.
+
+    .EXAMPLE
+        Get-ServiceNowRequestItem -MatchExact @{number='RITM0000001'}
+
+        Return the details for RITM0000001
+
+    .OUTPUTS
+        System.Management.Automation.PSCustomObject
+#>
+
     [OutputType([System.Management.Automation.PSCustomObject])]
     [CmdletBinding(DefaultParameterSetName, SupportsPaging)]
-    Param(
+    param(
         # Machine name of the field to order by
-        [Parameter(Mandatory = $false)]
+        [parameter(Mandatory = $false)]
         [string]$OrderBy = 'opened_at',
 
         # Direction of ordering (Desc/Asc)
-        [Parameter(Mandatory = $false)]
+        [parameter(Mandatory = $false)]
         [ValidateSet('Desc', 'Asc')]
         [string]$OrderDirection = 'Desc',
 
         # Maximum number of records to return
-        [Parameter(Mandatory = $false)]
+        [parameter(Mandatory = $false)]
         [int]$Limit,
 
         # Fields to return
@@ -21,15 +37,15 @@ function Get-ServiceNowIncident{
         [string[]]$Properties,
 
         # Hashtable containing machine field names and values returned must match exactly (will be combined with AND)
-        [Parameter(Mandatory = $false)]
+        [parameter(Mandatory = $false)]
         [hashtable]$MatchExact = @{},
 
         # Hashtable containing machine field names and values returned rows must contain (will be combined with AND)
-        [Parameter(Mandatory = $false)]
+        [parameter(Mandatory = $false)]
         [hashtable]$MatchContains = @{},
 
         # Whether or not to show human readable display values instead of machine values
-        [Parameter(Mandatory = $false)]
+        [parameter(Mandatory = $false)]
         [ValidateSet('true', 'false', 'all')]
         [string]$DisplayValues = 'true',
 
@@ -39,8 +55,7 @@ function Get-ServiceNowIncident{
         [PSCredential]$Credential,
 
         [Parameter(ParameterSetName = 'SpecifyConnectionFields', Mandatory = $true)]
-        [ValidateScript({Test-ServiceNowURL -Url $_})]
-        [Alias('Url')]
+        [ValidateNotNullOrEmpty()]
         [string]$ServiceNowURL,
 
         [Parameter(ParameterSetName = 'UseConnectionObject', Mandatory = $true)]
@@ -50,22 +65,22 @@ function Get-ServiceNowIncident{
 
     # Query Splat
     $newServiceNowQuerySplat = @{
-        OrderBy = $OrderBy
+        OrderBy        = $OrderBy
+        MatchExact     = $MatchExact
         OrderDirection = $OrderDirection
-        MatchExact = $MatchExact
-        MatchContains = $MatchContains
+        MatchContains  = $MatchContains
     }
     $Query = New-ServiceNowQuery @newServiceNowQuerySplat
 
     # Table Splat
     $getServiceNowTableSplat = @{
-        Table         = 'incident'
+        Table         = 'sc_req_item'
         Query         = $Query
         Fields        = $Properties
         DisplayValues = $DisplayValues
     }
 
-    # Update the splat if the parameters have values
+    # Update the Table Splat if the parameters have values
     if ($null -ne $PSBoundParameters.Connection) {
         $getServiceNowTableSplat.Add('Connection', $Connection)
     }
@@ -87,7 +102,7 @@ function Get-ServiceNowIncident{
     # Perform query and return each object in the format.ps1xml format
     $Result = Get-ServiceNowTable @getServiceNowTableSplat
     If (-not $Properties) {
-        $Result | ForEach-Object{$_.PSObject.TypeNames.Insert(0,"ServiceNow.Incident")}
+        $Result | ForEach-Object {$_.PSObject.TypeNames.Insert(0,'ServiceNow.RequestItem')}
     }
     $Result
 }

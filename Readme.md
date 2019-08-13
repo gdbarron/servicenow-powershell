@@ -1,6 +1,6 @@
 # ServiceNow
 
-[![GitHub release](https://img.shields.io/github/release/Sam-Martin/servicenow-powershell.svg)](https://github.com/Sam-Martin/servicenow-powershell/releases/latest) [![GitHub license](https://img.shields.io/github/license/Sam-Martin/servicenow-powershell.svg)](LICENSE) ![Test Coverage](https://img.shields.io/badge/coverage-78%25-yellow.svg)
+[![GitHub release](https://img.shields.io/github/release/Sam-Martin/servicenow-powershell.svg)](https://github.com/Sam-Martin/servicenow-powershell/releases/latest) [![GitHub license](https://img.shields.io/github/license/Sam-Martin/servicenow-powershell.svg)](LICENSE) ![Test Coverage](https://img.shields.io/badge/coverage-75%25-yellow.svg)
 
 This PowerShell module provides a series of cmdlets for interacting with the [ServiceNow REST API](http://wiki.servicenow.com/index.php?title=REST_API), performed by wrapping `Invoke-RestMethod` for the API calls.
 
@@ -32,6 +32,12 @@ These changes should improve your ability to filter on the right, especially by 
 
 Requires PowerShell 3.0 or above as this is when `Invoke-RestMethod` was introduced.
 
+Requires authorization in your ServiceNow tenant.  Due to the custom nature of ServiceNow your organization may have REST access restricted.  The following are some tips to ask for if you're having to go to your admin for access:
+
+* Out of the box tables should be accessible by granting the `ITIL` role.
+* Custom tables may require adjustments to the ACL.
+* The `Web_Service_Admin` role may also be an option.
+
 ## Usage
 
 Download the [latest release](https://github.com/Sam-Martin/servicenow-powershell/releases/latest) and  extract the .psm1 and .psd1 files to your PowerShell profile directory (i.e. the `Modules` directory under wherever `$profile` points to in your PS console) and run:
@@ -44,7 +50,7 @@ Once you've done this, all the cmdlets will be at your disposal, you can see a f
 Set-ServiceNowAuth -url InstanceName.service-now.com -Credentials (Get-Credential)
 ```
 
-The URL should be the instance name portion of the FQDN for your instance.  For if you browse to `https://yourinstance.service-now.com` the URL required for the module is `yourinstance.service-now.com`.
+The URL should be the instance name portion of the FQDN for your instance.  If you browse to `https://yourinstance.service-now.com` the URL required for the module is `yourinstance.service-now.com`.
 
 ### Example - Retrieving an Incident Containing the Word 'PowerShell'
 
@@ -66,6 +72,18 @@ Get-ServiceNowIncident -MatchContains @{short_description='PowerShell'} -Service
 ```PowerShell
 $Incident = Get-ServiceNowIncident -Limit 1 -MatchContains @{short_description='PowerShell'}
 Update-ServiceNowIncident -SysID $Incident.Sys_ID -Values @{comments='Updated via PowerShell'}
+```
+
+### Example - Creating a Incident with custom table entries
+
+```PowerShell
+$IncidentParams = @{Caller = "UserName" 
+            ShortDescription = "New PS Incident" 
+            Description = "This incident was created from Powershell" 
+            CustomFields = @{u_service = "MyService"
+                            u_incident_type = "Request"}
+            }
+New-ServiceNowIncident @Params
 ```
 
 ### Azure Connection Object (Automation Integration Module Support)
